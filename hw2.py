@@ -109,21 +109,16 @@ def my_EM(mus=np.array([4.0, 9.0, np.nan]),
     Returns:
     The output of the EM algorithms (the GMM final parameters): mus, sigmas, ws.
     """
-    # Load data
     data = pd.read_csv('GMD.csv', header=None)
     X = data.iloc[:, 1].values
     n_samples = len(X)
-    
-    # Number of components
     k = len(mus)
     
-    # Convert to numpy arrays and handle None values
     mus = np.array(mus, dtype=float).copy()
     sigmas = np.array(sigmas, dtype=float).copy()
     ws = np.array(ws, dtype=float).copy()
     
     # Track which parameters are fixed (not NaN)
-    # Use NaN to mark parameters that need estimation
     fixed_mus = ~np.isnan(mus)
     fixed_sigmas = ~np.isnan(sigmas)
     fixed_ws = ~np.isnan(ws)
@@ -144,9 +139,7 @@ def my_EM(mus=np.array([4.0, 9.0, np.nan]),
             unfixed_count = np.sum(~fixed_ws)
             ws[i] = (1 - fixed_weight_sum) / unfixed_count
     
-    # EM Algorithm
     for iteration in range(max_iter):
-        # Store old parameters for convergence check
         old_mus = mus.copy()
         old_sigmas = sigmas.copy()
         old_ws = ws.copy()
@@ -157,7 +150,6 @@ def my_EM(mus=np.array([4.0, 9.0, np.nan]),
         for j in range(k):
             gamma[:, j] = ws[j] * stats.norm.pdf(X, mus[j], sigmas[j])
         
-        # Normalize
         gamma_sum = gamma.sum(axis=1, keepdims=True)
         gamma = gamma / gamma_sum
         
@@ -169,26 +161,22 @@ def my_EM(mus=np.array([4.0, 9.0, np.nan]),
             if not fixed_mus[j]:
                 mus[j] = np.sum(gamma[:, j] * X) / N_j[j]
             
-            # Update sigma if not fixed
+            # Update sigma if not fixed (with floor to prevent degenerate cases)
             if not fixed_sigmas[j]:
-                sigmas[j] = np.sqrt(np.sum(gamma[:, j] * (X - mus[j])**2) / N_j[j])
+                sigmas[j] = max(np.sqrt(np.sum(gamma[:, j] * (X - mus[j])**2) / N_j[j]), 1e-6)
             
             # Update w if not fixed
             if not fixed_ws[j]:
                 ws[j] = N_j[j] / n_samples
         
-        # Renormalize weights if any were updated
+        # Renormalize weights so they sum to 1
         if not np.all(fixed_ws):
-            # Fixed weights sum
             fixed_sum = np.sum(ws[fixed_ws])
-            # Current unfixed weights sum
             unfixed_sum = np.sum(ws[~fixed_ws])
-            # Scale unfixed weights so total is 1
             if unfixed_sum > 0:
                 scale = (1 - fixed_sum) / unfixed_sum
                 ws[~fixed_ws] = ws[~fixed_ws] * scale
         
-        # Check convergence
         mu_diff = np.max(np.abs(mus - old_mus))
         sigma_diff = np.max(np.abs(sigmas - old_sigmas))
         w_diff = np.max(np.abs(ws - old_ws))
@@ -219,16 +207,9 @@ def q3d(mus=np.array([4.0, 9.0, 15.0]),
     sigmas = np.array(sigmas)
     ws = np.array(ws)
     
-    k = len(mus)  # number of components
-    
-    # Sample component indices based on weights
+    k = len(mus)
     component_indices = np.random.choice(k, size=n_samples, p=ws)
-    
-    # Generate samples from the chosen components
-    samples = np.zeros(n_samples)
-    for i in range(n_samples):
-        j = component_indices[i]
-        samples[i] = np.random.normal(mus[j], sigmas[j])
+    samples = np.random.normal(mus[component_indices], sigmas[component_indices])
     
     return samples
 
