@@ -140,7 +140,7 @@ def my_EM(mus=np.array([4.0, 9.0, np.nan]),
             if not np.all(fixed_ws):
                 fixed_sum = np.sum(ws_curr[fixed_ws])
                 unfixed_sum = np.sum(ws_curr[~fixed_ws])
-                if unfixed_sum > 1e-10:
+                if unfixed_sum > 0:
                     scale = (1 - fixed_sum) / unfixed_sum
                     ws_curr[~fixed_ws] *= scale
             
