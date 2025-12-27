@@ -125,24 +125,24 @@ def my_EM(mus=np.array([4.0, 9.0, np.nan]),
             
             # M-step
             N_j = np.maximum(gamma.sum(axis=0), 1e-10)
-            
+
             for j in range(k):
                 if not fixed_mus[j]:
                     mus_curr[j] = np.sum(gamma[:, j] * X) / N_j[j]
-                
+
                 if not fixed_sigmas[j]:
                     variance = np.sum(gamma[:, j] * (X - mus_curr[j])**2) / N_j[j]
                     sigmas_curr[j] = max(np.sqrt(variance), 1e-6)
-                
+
                 if not fixed_ws[j]:
                     ws_curr[j] = N_j[j] / n_samples
-            
+
             if not np.all(fixed_ws):
                 fixed_sum = np.sum(ws_curr[fixed_ws])
                 unfixed_sum = np.sum(ws_curr[~fixed_ws])
-                if unfixed_sum > 0:
+                if unfixed_sum > 1e-10:
                     scale = (1 - fixed_sum) / unfixed_sum
-                    ws_curr[~fixed_ws] = ws_curr[~fixed_ws] * scale
+                    ws_curr[~fixed_ws] *= scale
             
             if max(np.max(np.abs(mus_curr - old_mus)),
                    np.max(np.abs(sigmas_curr - old_sigmas)),
@@ -159,7 +159,7 @@ def my_EM(mus=np.array([4.0, 9.0, np.nan]),
         mus_init = np.array(mus, dtype=float).copy()
         sigmas_init = np.array(sigmas, dtype=float).copy()
         ws_init = np.array(ws, dtype=float).copy()
-        
+
         data_std = np.std(X)
         nan_mu_indices = np.where(~fixed_mus)[0]
         
@@ -169,21 +169,20 @@ def my_EM(mus=np.array([4.0, 9.0, np.nan]),
                 if len(centers) == 0:
                     mus_init[idx] = X[np.random.randint(n_samples)]
                 else:
-                    distances = np.array([min((x - c)**2 for c in centers) for x in X])
+                    distances = np.array([min((x - c) ** 2 for c in centers) for x in X])
                     distances = distances / (distances.sum() + 1e-10)
                     chosen_idx = np.random.choice(n_samples, p=distances)
                     mus_init[idx] = X[chosen_idx]
                 centers.append(mus_init[idx])
-        
+
         for i in range(k):
             if np.isnan(sigmas_init[i]):
-                distances = np.abs(X - mus_init[i])
-                nearby_mask = distances < data_std
-                if np.sum(nearby_mask) > 10:
-                    sigmas_init[i] = np.std(X[nearby_mask])
+                dists = [abs(mus_init[i] - mus_init[j]) for j in range(k) if i != j]
+                if dists:
+                    sigmas_init[i] = min(dists) / 2
                 else:
                     sigmas_init[i] = data_std / k
-                sigmas_init[i] = max(sigmas_init[i], 0.1)
+                sigmas_init[i] = np.clip(sigmas_init[i], 0.1, data_std)
         
         for i in range(k):
             if np.isnan(ws_init[i]):
@@ -192,20 +191,20 @@ def my_EM(mus=np.array([4.0, 9.0, np.nan]),
                 ws_init[i] = (1 - fixed_weight_sum) / unfixed_count
         
         return mus_init, sigmas_init, ws_init
-    
-    n_restarts = 10
+
+    n_restarts = 50
     best_ll = -np.inf
     best_result = None
-    
+
     for restart in range(n_restarts):
         seed = restart * 42 if restart > 0 else None
         mus_init, sigmas_init, ws_init = initialize_params(seed)
         mus_res, sigmas_res, ws_res, ll = run_em(mus_init, sigmas_init, ws_init)
-        
+
         if ll > best_ll:
             best_ll = ll
             best_result = (mus_res.copy(), sigmas_res.copy(), ws_res.copy())
-    
+
     return best_result
 
 # TODO: Added 'n_samples' parameter to match test expected signature
